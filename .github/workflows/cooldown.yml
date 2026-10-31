@@ -1,0 +1,60 @@
+# Cooldown through the Harden-Runner secure-registry pre step (SR-CI-11) on
+# macOS and Windows. ubuntu-latest is left out: int Harden-Runner builds kill
+# those jobs (see control.yml).
+name: SR-CI-11 cooldown (macOS, Windows)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  enforce:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11-secure-registry-pre
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+      - run: bash .github/scripts/check-npm.sh cooldown blocked
+
+  audit:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11-secure-registry-pre
+        with:
+          egress-policy: audit
+          secure-registry: |
+            npm:
+              mode: audit
+              cooldown:
+                days: 3
+              lockfile-resolved: omit
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+        env:
+          EXPECT_OMIT_RESOLVED: "true"
+      - run: bash .github/scripts/check-npm.sh cooldown allowed

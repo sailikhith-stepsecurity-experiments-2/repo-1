@@ -3,8 +3,9 @@
 #
 #   check-npm.sh secure              npm uses secure-registry for every fetch
 #   check-npm.sh default             npm is untouched
-#   check-npm.sh cooldown blocked    a typescript@next build (under 2 days old) is hidden
-#   check-npm.sh cooldown allowed    the same build is served (audit mode)
+#   check-npm.sh cooldown blocked    a typescript@next build (under 2 days old) is
+#                                    missing from metadata and its tarball is refused
+#   check-npm.sh cooldown allowed    the same build is listed and served (audit mode)
 #
 # EXPECT_OMIT_RESOLVED=true additionally requires omit-lockfile-registry-resolved.
 set -euo pipefail
@@ -69,30 +70,46 @@ case "$1" in
     upstream=https://registry.npmjs.org/
     next=$(npm view typescript dist-tags.next --registry="$upstream")
     published=$(npm view typescript "time[$next]" --registry="$upstream")
-    age_h=$(( ($(date -u +%s) - $(date -u -d "$published" +%s)) / 3600 ))
+    # node instead of date: BSD date on macOS has no -d.
+    age_h=$(node -e 'console.log(Math.floor((Date.now() - Date.parse(process.argv[1])) / 3600000))' "$published")
     echo "typescript@$next was published $published (${age_h}h ago)"
     if [ "$age_h" -ge 48 ]; then
       echo "::warning title=cooldown probe::typescript@next is ${age_h}h old, outside the 2-day cooldown; probe skipped"
       exit 0
     fi
+    cd "$RUNNER_TEMP"
 
-    rc=0
-    got=$(npm view "typescript@$next" version 2>"$RUNNER_TEMP/view.err") || rc=$?
-    echo "secure-registry answered: exit $rc, version '${got}'"
-    tail -5 "$RUNNER_TEMP/view.err" || true
+    # Metadata: in enforce mode the version is removed from the packument.
+    meta_rc=0
+    got=$(npm view "typescript@$next" version 2>view.err) || meta_rc=$?
+    echo "metadata: exit $meta_rc, version '${got}'"
+    tail -3 view.err || true
+    meta_served=false
+    [ "$meta_rc" -eq 0 ] && [ "$got" = "$next" ] && meta_served=true
+
+    # Tarball: a lockfile pins the tarball URL and skips metadata, so the
+    # tarball has to be refused on its own.
+    tarball="${registry}typescript/-/typescript-$next.tgz"
+    tar_rc=0
+    npm pack "$tarball" --dry-run --loglevel=http >pack.out 2>&1 || tar_rc=$?
+    echo "tarball: exit $tar_rc"
+    grep -E "npm http fetch|npm error (code|40[0-9])" pack.out | sed -E 's#https://[^ ]*/javascript/#<registry>/#' | head -5 || true
+    tar_served=false
+    [ "$tar_rc" -eq 0 ] && tar_served=true
+
+    summary="typescript@$next (${age_h}h old): metadata served=$meta_served, tarball served=$tar_served"
     case "$expect" in
       blocked)
-        { [ "$rc" -ne 0 ] || [ "$got" != "$next" ]; } \
-          || fail "typescript@$next (${age_h}h old) was served; the 2-day cooldown should hide it"
-        echo "::notice title=cooldown probe::typescript@$next (${age_h}h old) was withheld as expected"
+        [ "$meta_served" = false ] && [ "$tar_served" = false ] \
+          || fail "$summary; the 2-day cooldown should refuse both"
         ;;
       allowed)
-        [ "$rc" -eq 0 ] && [ "$got" = "$next" ] \
-          || fail "typescript@$next was not served; audit mode should only report it"
-        echo "::notice title=cooldown probe::typescript@$next (${age_h}h old) was served, as audit mode should"
+        [ "$meta_served" = true ] && [ "$tar_served" = true ] \
+          || fail "$summary; audit mode should serve both"
         ;;
       *) fail "unknown cooldown expectation '$expect'" ;;
     esac
+    echo "::notice title=cooldown ${GITHUB_JOB:-probe} ($RUNNER_OS)::$summary, as expected"
     ;;
 
   *) fail "unknown check '$1'" ;;
