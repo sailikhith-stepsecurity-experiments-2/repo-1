@@ -1,0 +1,94 @@
+# SR-CI-14 yarn follow-up.
+#   berry: rerun with Yarn's own age gate off; expected uncovered (Yarn 2+
+#          does not read .npmrc).
+#   classic-always-auth: yarn 1 sends auth for unscoped packages only with
+#          always-auth, so `yarn add` got 401 in run 41169123093. Try a
+#          host-scoped always-auth line and check npm/pnpm do not complain.
+name: SR-CI-14 yarn
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  berry:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-slim]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: bash .github/scripts/check-pm.sh yarn-berry fresh uncovered
+      - if: always()
+        run: bash .github/scripts/check-pm.sh yarn-berry lockfile uncovered
+
+  classic-always-auth:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-slim]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install -g --force yarn@1.22.22 pnpm@12.16.1
+      - name: add host-scoped always-auth
+        run: |
+          reg=$(npm config get registry)
+          line="${reg#https:}:always-auth=true"
+          echo "$line" >> "$NPM_CONFIG_USERCONFIG"
+          sed -E 's/(_authToken=).*/\1<redacted>/' "$NPM_CONFIG_USERCONFIG"
+      - name: yarn classic fresh and lockfile
+        run: |
+          bash .github/scripts/check-pm.sh yarn-classic fresh covered
+      - if: always()
+        run: bash .github/scripts/check-pm.sh yarn-classic lockfile uncovered
+      - name: no token sent to registry.yarnpkg.com
+        if: always()
+        run: |
+          d="$RUNNER_TEMP/srci14-yarn-classic-lockfile"
+          grep -iE 'authorization|bearer' "$RUNNER_TEMP/yarn-classic-lockfile.log" | head -5 || true
+          echo "requests to yarnpkg: $(grep -c 'registry.yarnpkg.com' "$RUNNER_TEMP/yarn-classic-lockfile.log" || true)"
+      - name: npm 10, 11, 12 and pnpm warnings for the extra line
+        if: always()
+        run: |
+          for cmd in "npm config get registry" "npx -y npm@11.6.2 config get registry" "npx -y npm@12.2.1 config get registry" "pnpm config get registry"; do
+            echo "--- $cmd"
+            out=$($cmd 2>&1)
+            echo "$out"
+            if echo "$out" | grep -qiE 'warn|unknown'; then
+              echo "::warning title=always-auth line::$cmd printed a warning"
+            fi
+          done
+          npm ci --no-audit --no-fund 2>&1 | tail -3
