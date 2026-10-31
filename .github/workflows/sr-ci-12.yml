@@ -118,3 +118,34 @@ jobs:
           npm --version
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git diff package-lock.json | grep -E '^\+.*resolved' || true
+
+  # npm 10 and 11 both record registry.npmjs.org URLs against int, so the
+  # leak is simulated to exercise the post-step check on real runners.
+  # Expect in post: lockfile warning for package-lock.json.
+  lockfile-simulated:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+          - os: ubuntu-latest
+            container: node:22
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: |
+          host=$(npm config get registry | cut -d/ -f3)
+          sed -i.bak "s#https://registry.npmjs.org/#https://$host/javascript/#" package-lock.json
+          rm package-lock.json.bak
+          grep -c "$host" package-lock.json
