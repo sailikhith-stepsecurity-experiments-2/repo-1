@@ -79,7 +79,16 @@ jobs:
           secure-registry: true
       - uses: actions/checkout@v4
       - run: npm install --no-audit --no-fund ms@2.1.3
-      - run: git status --short && grep -c registry-int package-lock.json
+      - run: |
+          npm --version
+          npm config get replace-registry-host
+          git diff package-lock.json | head -60
+      # A fresh lockfile, no npmjs entries to keep (SR-CI-02 case).
+      - run: |
+          mkdir -p fresh && cd fresh
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund ms@2.1.3
+          grep resolved package-lock.json
 
   # Expect in post: no secure-registry lines at all.
   not-configured:
