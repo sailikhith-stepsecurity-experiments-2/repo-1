@@ -1,0 +1,38 @@
+# SR-CI-14 trigger rows (SR-CI-01 decisions). macOS only: int builds kill
+# ubuntu-latest jobs. pull_request_target checks out the base branch, never
+# the PR head.
+#   same-repo / Dependabot pull_request   -> secure-registry
+#   pull_request_target (fork or not)     -> secure-registry
+#   fork pull_request                     -> no OIDC token, default registry + fork notice
+name: SR-CI-14 triggers
+
+on:
+  pull_request:
+  pull_request_target:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - env:
+          EVENT: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          FORK: ${{ github.event.pull_request.head.repo.fork }}
+        run: |
+          echo "event=$EVENT actor=$ACTOR head=$HEAD_REPO fork=$FORK"
+          expect=secure
+          if [ "$EVENT" = pull_request ] && [ "$FORK" = true ]; then expect=default; fi
+          echo "expect: $expect"
+          bash .github/scripts/check-npm.sh "$expect"
