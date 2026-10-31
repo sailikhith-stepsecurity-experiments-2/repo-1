@@ -1,0 +1,8 @@
+# SR-CI-14: Dependabot PRs must be redirected like any same-repo PR.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: daily
+    open-pull-requests-limit: 1
