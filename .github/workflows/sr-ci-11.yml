@@ -63,7 +63,7 @@ jobs:
               mode: audit
               cooldown:
                 days: 3
-              lockfile_resolved: omit
+              lockfile-resolved: omit
       - uses: actions/checkout@v4
       - run: bash .github/scripts/check-npm.sh secure
         env:
