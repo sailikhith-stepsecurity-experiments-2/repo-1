@@ -1,0 +1,70 @@
+# Checks agent-api #11928: the first parallel burst of npm fetches against a
+# freshly deployed registry task must not get 401s. Uses only jobs that int
+# Harden-Runner builds do not kill (no full agent on ubuntu-latest).
+name: SR-CI-11 cold-start burst
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    container: node:22
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11-secure-registry-pre
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: date -u +%FT%TZ && bash .github/scripts/check-npm.sh secure
+
+  ubuntu-slim:
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11-secure-registry-pre
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: date -u +%FT%TZ && bash .github/scripts/check-npm.sh secure
+
+  macos:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11-secure-registry-pre
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: date -u +%FT%TZ && bash .github/scripts/check-npm.sh secure
+
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11-secure-registry-pre
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: date -u +%FT%TZ && bash .github/scripts/check-npm.sh secure
