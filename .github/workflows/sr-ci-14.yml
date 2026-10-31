@@ -13,19 +13,23 @@ permissions:
 
 jobs:
   # Fresh install and existing npmjs lockfile, per package manager.
-  # Expectations are the design doc's; a mismatch fails the job.
+  # Expectations are the observed behavior from round 1 (run 41169123093)
+  # plus the yarn classic always-auth fix; a mismatch fails the job.
+  # npm10 is the npm bundled with node 22.
   package-managers:
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-slim]
-        pm: [npm, pnpm, yarn-classic, yarn-berry, bun]
+        pm: [npm10, npm11, npm12, pnpm, yarn-classic, yarn-berry, bun]
         include:
-          - { pm: npm, fresh: covered, lockfile: covered }
-          - { pm: pnpm, fresh: covered, lockfile: covered }
-          - { pm: yarn-classic, fresh: covered, lockfile: uncovered }
-          - { pm: yarn-berry, fresh: covered, lockfile: covered }
-          - { pm: bun, fresh: covered, lockfile: uncovered }
+          - { pm: npm10, tool: npm, node: 22, fresh: covered, lockfile: covered }
+          - { pm: npm11, tool: npm, node: 22, npm: 11.6.2, fresh: covered, lockfile: covered }
+          - { pm: npm12, tool: npm, node: 24, npm: 12.2.1, fresh: covered, lockfile: covered }
+          - { pm: pnpm, tool: pnpm, node: 22, fresh: covered, lockfile: covered }
+          - { pm: yarn-classic, tool: yarn-classic, node: 22, fresh: covered, lockfile: uncovered }
+          - { pm: yarn-berry, tool: yarn-berry, node: 22, fresh: uncovered, lockfile: uncovered }
+          - { pm: bun, tool: bun, node: 22, fresh: covered, lockfile: covered }
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -44,7 +48,9 @@ jobs:
       # No registry-url: setup-node keeps our config (SR-CI-02 case a).
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
+      - if: matrix.npm
+        run: npm install -g npm@${{ matrix.npm }} && npm --version
       - if: matrix.pm == 'pnpm'
         run: npm install -g pnpm@12.16.1 && pnpm --version
       - if: matrix.pm == 'yarn-classic'
@@ -55,9 +61,27 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
-      - run: bash .github/scripts/check-pm.sh ${{ matrix.pm }} fresh ${{ matrix.fresh }}
+      - run: bash .github/scripts/check-pm.sh ${{ matrix.tool }} fresh ${{ matrix.fresh }}
       - if: always()
-        run: bash .github/scripts/check-pm.sh ${{ matrix.pm }} lockfile ${{ matrix.lockfile }}
+        run: bash .github/scripts/check-pm.sh ${{ matrix.tool }} lockfile ${{ matrix.lockfile }}
+      # npm rows: the repo's own npm ci, the cooldown probe, and every
+      # "npm warn" line the job's npm config produces (npm 11 is expected to
+      # warn about the host-scoped always-auth line, 10 and 12 not).
+      - if: always() && matrix.tool == 'npm'
+        run: bash .github/scripts/check-npm.sh secure
+      - if: always() && matrix.tool == 'npm'
+        run: bash .github/scripts/check-npm.sh cooldown blocked
+      - if: always() && matrix.tool == 'npm'
+        run: |
+          out=$(npm config get registry 2>&1 >/dev/null || true)
+          if [ -n "$out" ]; then
+            echo "$out"
+            echo "::notice title=npm $(npm --version) stderr::$(echo "$out" | head -1)"
+          else
+            echo "::notice title=npm $(npm --version) stderr::none"
+          fi
+      - if: always()
+        run: sed -E 's/(_authToken=).*/\1<redacted>/' "$NPM_CONFIG_USERCONFIG"
 
   # setup-node with a GitHub Packages registry-url after Harden-Runner:
   # our registry stays, setup-node's scope and auth lines are added.
