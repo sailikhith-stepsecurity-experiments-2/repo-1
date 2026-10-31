@@ -1,0 +1,190 @@
+# SR-CI-14 end-to-end matrix for community secure-registry on int.
+# Uses the int build of the SR-CI-11 pre step + SR-CI-12 post step.
+# ubuntu-latest runs the full Harden-Runner agent, which int builds kill
+# (see control.yml), so only the rows that need it (docker build, egress
+# block) run there; treat a killed job as the known environment issue.
+name: SR-CI-14 e2e
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Fresh install and existing npmjs lockfile, per package manager.
+  # Expectations are the design doc's; a mismatch fails the job.
+  package-managers:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-slim]
+        pm: [npm, pnpm, yarn-classic, yarn-berry, bun]
+        include:
+          - { pm: npm, fresh: covered, lockfile: covered }
+          - { pm: pnpm, fresh: covered, lockfile: covered }
+          - { pm: yarn-classic, fresh: covered, lockfile: uncovered }
+          - { pm: yarn-berry, fresh: covered, lockfile: covered }
+          - { pm: bun, fresh: covered, lockfile: uncovered }
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      # No registry-url: setup-node keeps our config (SR-CI-02 case a).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - if: matrix.pm == 'pnpm'
+        run: npm install -g pnpm@12.16.1 && pnpm --version
+      - if: matrix.pm == 'yarn-classic'
+        run: npm install -g --force yarn@1.22.22 && yarn --version
+      - if: matrix.pm == 'yarn-berry'
+        run: corepack enable && corepack --version
+      - if: matrix.pm == 'bun'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bash .github/scripts/check-pm.sh ${{ matrix.pm }} fresh ${{ matrix.fresh }}
+      - if: always()
+        run: bash .github/scripts/check-pm.sh ${{ matrix.pm }} lockfile ${{ matrix.lockfile }}
+
+  # setup-node with a GitHub Packages registry-url after Harden-Runner:
+  # our registry stays, setup-node's scope and auth lines are added.
+  # (setup-node before Harden-Runner cannot happen: the pre step runs first.)
+  setup-node-github-packages:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: "@sailikhith-stepsecurity-experiments-2"
+      - run: |
+          f="$NPM_CONFIG_USERCONFIG"
+          grep -q '^@sailikhith-stepsecurity-experiments-2:registry=https://npm.pkg.github.com/' "$f" \
+            || { echo "::error::setup-node scope line missing"; exit 1; }
+          grep -q '^//npm.pkg.github.com/:_authToken=' "$f" \
+            || { echo "::error::setup-node auth line missing"; exit 1; }
+      - run: bash .github/scripts/check-npm.sh secure
+
+  # NPM_CONFIG_REGISTRY set for the job: expect a notice in the pre step
+  # and npm left alone.
+  npm-config-registry-env:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh default
+
+  # A project .npmrc with registry= beats the user config: not covered,
+  # nothing breaks.
+  project-npmrc-mirror:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: |
+          echo 'registry=https://registry.npmmirror.com/' > .npmrc
+          reg=$(npm config get registry)
+          echo "registry: $reg"
+          [ "$reg" = https://registry.npmmirror.com/ ] || { echo "::error::expected the project mirror, got $reg"; exit 1; }
+          npm ci --no-audit --no-fund --loglevel=http 2>&1 | grep 'npm http fetch' | head -3
+
+  # Registry unreachable after the session was created. npm has no
+  # failover, so this documents what happens: the step is expected to fail.
+  registry-down-after-session:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: |
+          host=$(npm config get registry | cut -d/ -f3)
+          echo "127.0.0.1 $host" | sudo tee -a /etc/hosts
+          start=$(date +%s)
+          rc=0
+          npm ci --no-audit --no-fund 2>&1 | tail -8 || true
+          npm ci --no-audit --no-fund >/dev/null 2>&1 || rc=$?
+          echo "npm ci exit $rc after $(( $(date +%s) - start ))s (both attempts)"
+          [ "$rc" -ne 0 ] || { echo "::error::npm ci succeeded with the registry unreachable"; exit 1; }
+          echo "::notice title=registry down::npm ci fails (exit $rc) when the registry is unreachable mid-job; no failover"
+
+  # docker build does not see the runner's npm config: not covered, passes.
+  # Needs ubuntu-latest (full agent).
+  docker-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: |
+          printf 'FROM node:22\nWORKDIR /app\nCOPY package.json package-lock.json ./\nRUN npm config get registry && npm ci --no-audit --no-fund\n' > Dockerfile.srci14
+          docker build --progress=plain -f Dockerfile.srci14 .
+
+  # Block mode: the registry host is added to allowed-endpoints, so npm ci
+  # works with only GitHub endpoints listed. Needs ubuntu-latest.
+  hosted-block:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+      - name: registry.npmjs.org is blocked
+        run: |
+          if curl -sS -m 15 -o /dev/null https://registry.npmjs.org/; then
+            echo "::error::registry.npmjs.org is reachable in block mode"
+            exit 1
+          fi
+          echo "registry.npmjs.org is blocked, so npm ci only worked through the added secure-registry endpoint"
