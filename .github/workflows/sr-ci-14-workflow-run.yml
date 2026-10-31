@@ -1,0 +1,30 @@
+# SR-CI-14: workflow_run triggered by the triggers workflow (including from
+# a fork PR) gets an OIDC token and is redirected.
+name: SR-CI-14 workflow_run
+
+on:
+  workflow_run:
+    workflows: ["SR-CI-14 triggers"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - env:
+          TRIGGER_EVENT: ${{ github.event.workflow_run.event }}
+          TRIGGER_HEAD: ${{ github.event.workflow_run.head_repository.full_name }}
+        run: |
+          echo "workflow_run of a $TRIGGER_EVENT run from $TRIGGER_HEAD"
+          bash .github/scripts/check-npm.sh secure
