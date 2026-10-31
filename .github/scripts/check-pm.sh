@@ -57,8 +57,11 @@ pm_run() {
         yarn "$@" --cache-folder "$cache" --verbose ${reg:+--registry "$reg"}
         ;;
       yarn-berry)
+        # Yarn 4 has its own release-age gate ("quarantined"); turn it off so
+        # only secure-registry can refuse the probe.
         YARN_CACHE_FOLDER="$cache" YARN_ENABLE_GLOBAL_CACHE=false \
           YARN_ENABLE_MIRROR=false YARN_ENABLE_TELEMETRY=false \
+          YARN_NPM_MINIMAL_AGE_GATE=0 \
           ${reg:+YARN_NPM_REGISTRY_SERVER="${reg%/}"} \
           yarn "$@"
         ;;
