@@ -98,3 +98,23 @@ jobs:
         with:
           egress-policy: audit
       - run: echo nothing to do
+
+  # npm 10 (node:22 image), the version SR-CI-02 saw leak our host into
+  # lockfiles. Expect in post: lockfile warning for package-lock.json.
+  lockfile-leak-npm10:
+    runs-on: ubuntu-latest
+    container: node:22
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: npm install --no-audit --no-fund ms@2.1.3
+      - run: |
+          npm --version
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git diff package-lock.json | grep -E '^\+.*resolved' || true
