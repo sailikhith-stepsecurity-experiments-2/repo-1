@@ -1,0 +1,154 @@
+# End-to-end test of the Harden-Runner secure-registry pre step (SR-CI-11)
+# against int. Uses the int build of the fork branch.
+name: SR-CI-11 secure-registry pre step
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hosted-audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11-secure-registry-pre
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bash .github/scripts/check-npm.sh secure
+      - run: bash .github/scripts/check-npm.sh cooldown blocked
+
+  hosted-block:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11-secure-registry-pre
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+      - name: registry.npmjs.org is blocked
+        run: |
+          if curl -sS -m 15 -o /dev/null https://registry.npmjs.org/; then
+            echo "::error::registry.npmjs.org is reachable in block mode"
+            exit 1
+          fi
+          echo "registry.npmjs.org is blocked, so npm ci only worked through the added secure-registry endpoint"
+
+  config-audit-mode:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11-secure-registry-pre
+        with:
+          egress-policy: audit
+          secure-registry: |
+            npm:
+              mode: audit
+              cooldown:
+                days: 3
+              lockfile_resolved: omit
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+        env:
+          EXPECT_OMIT_RESOLVED: "true"
+      - run: bash .github/scripts/check-npm.sh cooldown allowed
+
+  container:
+    runs-on: ubuntu-latest
+    container: node:22
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11-secure-registry-pre
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+
+  ubuntu-slim:
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11-secure-registry-pre
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: bash .github/scripts/check-npm.sh secure
+
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11-secure-registry-pre
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+
+  macos:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11-secure-registry-pre
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+
+  input-off:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11-secure-registry-pre
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh default
+
+  no-id-token:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11-secure-registry-pre
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh default

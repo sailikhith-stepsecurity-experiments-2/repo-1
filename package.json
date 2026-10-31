@@ -1,0 +1,11 @@
+{
+  "name": "sr-ci-11-test",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fixture for the SR-CI-11 secure-registry pre step test",
+  "dependencies": {
+    "@sindresorhus/is": "4.6.0",
+    "chalk": "4.1.2",
+    "lodash": "4.17.21"
+  }
+}
