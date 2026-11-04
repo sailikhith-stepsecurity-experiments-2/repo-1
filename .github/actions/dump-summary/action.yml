@@ -1,6 +1,7 @@
 name: dump-step-summaries
-description: Test helper. Its post step prints every non-empty step summary file written so far in the job (place it before Harden-Runner so its post runs after Harden-Runner's).
+description: Test helper. Its post step prints every non-empty step summary file written so far in the job. List it before Harden-Runner; the pre step makes its post run after Harden-Runner's (post steps run in reverse order of each action's first step).
 runs:
   using: node20
+  pre: main.js
   main: main.js
   post: post.js
