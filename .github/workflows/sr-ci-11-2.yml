@@ -1,0 +1,133 @@
+# `ecosystem-defaults` and `ecosystems` in the secure-registry input
+# (SR-CI-11.2, backend SR-CI-05.2). Each job's comment says what the
+# Harden-Runner pre step should log; check-npm.sh checks npm itself.
+name: SR-CI-11.2 ecosystem-defaults / ecosystems
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Resolved npm config: mode audit, cooldown 3 days (from ecosystem-defaults).
+  eco-defaults-audit:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write }
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+        with:
+          egress-policy: audit
+          secure-registry: |
+            ecosystem-defaults:
+              mode: audit
+              cooldown:
+                days: 3
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+      - run: bash .github/scripts/check-npm.sh cooldown allowed
+
+  # The npm block overrides ecosystem-defaults: mode enforce.
+  eco-defaults-npm-override:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write }
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+        with:
+          egress-policy: audit
+          secure-registry: |
+            ecosystem-defaults:
+              mode: audit
+            npm:
+              mode: enforce
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+      - run: bash .github/scripts/check-npm.sh cooldown blocked
+
+  # npm listed: routed, with ecosystem-defaults applied (mode audit).
+  ecosystems-npm:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write }
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+        with:
+          egress-policy: audit
+          secure-registry: |
+            ecosystems: [npm]
+            ecosystem-defaults:
+              mode: audit
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+      - run: bash .github/scripts/check-npm.sh cooldown allowed
+
+  # Same as `true`: routed, enforce with a 2-day cooldown.
+  ecosystems-all:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write }
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+        with:
+          egress-policy: audit
+          secure-registry: |
+            ecosystems: all
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+      - run: bash .github/scripts/check-npm.sh cooldown blocked
+
+  # npm not listed: no session. Expect notices unsupported_ecosystem (pypi) and
+  # ecosystem_not_covered (npm), then "npm is not listed in ecosystems".
+  ecosystems-pypi:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write }
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+        with:
+          egress-policy: audit
+          secure-registry: |
+            ecosystems: [pypi]
+            npm:
+              mode: enforce
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh default
+
+  # npm covered but off: no session, "npm is off".
+  npm-off:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write }
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+        with:
+          egress-policy: audit
+          secure-registry: |
+            npm:
+              mode: off
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh default
+
+  # The old key is unknown now: notice, ignored, so npm stays on enforce.
+  old-defaults-key:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write }
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+        with:
+          egress-policy: audit
+          secure-registry: |
+            defaults:
+              mode: audit
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+      - run: bash .github/scripts/check-npm.sh cooldown blocked
+
+  # An empty list is invalid_value: key ignored, coverage stays all.
+  ecosystems-empty:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write }
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+        with:
+          egress-policy: audit
+          secure-registry: |
+            ecosystems: []
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
