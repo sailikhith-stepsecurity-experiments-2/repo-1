@@ -43,8 +43,12 @@ jobs:
       - run: bash .github/scripts/check-npm.sh secure
 
   # Hosted path with the one-time key: binding hr_key. Expect: no line.
-  macos-hr-key:
-    runs-on: macos-latest
+  # windows-latest: macOS arm64 runners were not available on 2026-11-04.
+  hosted-hr-key:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       # Its post step runs after Harden-Runner's and prints the job summary.
       - uses: sailikhith-stepsecurity-experiments-2/repo-1/.github/actions/dump-summary@main
@@ -60,11 +64,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-slim]
+        os: [windows-latest, ubuntu-slim]
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
       id-token: write
+    defaults:
+      run:
+        shell: bash
     steps:
       # Its post step runs after Harden-Runner's and prints the job summary.
       - uses: sailikhith-stepsecurity-experiments-2/repo-1/.github/actions/dump-summary@main
