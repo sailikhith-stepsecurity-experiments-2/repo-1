@@ -1,0 +1,67 @@
+# SR-CI-12.1 e2e: the post step adds "not linked to run insights" to the
+# job summary when the session's binding is none. Each job's comment gives
+# the expected binding (pre step prints "binding: ...") and whether the job
+# summary should carry the line. ubuntu-latest without a container is left
+# out: int Harden-Runner builds kill those jobs (see control.yml).
+name: SR-CI-12.1 binding in job summary
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # No /monitor on ubuntu-slim: binding none. Cooldown probe adds held and
+  # blocked rows if the summary has them. Expect: line in the job summary.
+  slim-none:
+    runs-on: ubuntu-slim
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+      - run: bash .github/scripts/check-npm.sh cooldown blocked
+
+  # No /monitor in container jobs: binding none. Expect: line.
+  container-none:
+    runs-on: ubuntu-latest
+    container: node:22
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+
+  # Hosted path with the one-time key: binding hr_key. Expect: no line.
+  macos-hr-key:
+    runs-on: macos-latest
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+
+  # binding oidc. Expect: no line.
+  oidc:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-slim]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
