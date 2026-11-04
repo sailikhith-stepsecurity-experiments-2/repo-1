@@ -1,0 +1,84 @@
+# SR-CI-11.1 e2e: secure-registry sessions without id-token (declared claims
+# + Harden-Runner one-time key). Each job's comment says which binding the
+# pre step should print ("binding: ..." in the secure-registry group).
+# workflow_dispatch runs the runner matrix; a fork pull_request runs fork-pr.
+name: SR-CI-11.1 session without id-token
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Main hosted path, /monitor issues the key: binding hr_key, no notice.
+  no-id-token:
+    if: github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+
+  # OIDC path still wins when id-token is available: binding oidc.
+  with-id-token:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+
+  # No /monitor on ubuntu-slim: binding none + "not linked to run insights" notice.
+  slim-no-id-token:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-slim
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+
+  # No /monitor in container jobs: binding none + notice.
+  container-no-id-token:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    container: node:22
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
+
+  # Fork pull_request (no OIDC possible): used to skip, now binding hr_key.
+  fork-pr:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: macos-latest
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/check-npm.sh secure
