@@ -1,0 +1,23 @@
+# SR-CI-11.1 spike: where does check_run_id come from without id-token? Throwaway, delete after.
+name: sr-ci-11-1-crid
+on:
+  workflow_dispatch:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest, ubuntu-slim]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: sailikhith-stepsecurity-experiments-2/repo-1/.github/actions/crid-probe@main
+      - run: echo "CTX check_run_id=${{ job.check_run_id }}"
+  container:
+    runs-on: ubuntu-latest
+    container: node:22
+    steps:
+      - uses: sailikhith-stepsecurity-experiments-2/repo-1/.github/actions/crid-probe@main
+      - run: echo "CTX check_run_id=${{ job.check_run_id }}"
