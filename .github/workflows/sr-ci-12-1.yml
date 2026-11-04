@@ -3,6 +3,7 @@
 # the expected binding (pre step prints "binding: ...") and whether the job
 # summary should carry the line. ubuntu-latest without a container is left
 # out: int Harden-Runner builds kill those jobs (see control.yml).
+# The job summary is printed in the log by the dump-summary post step.
 name: SR-CI-12.1 binding in job summary
 
 on:
@@ -17,6 +18,8 @@ jobs:
   slim-none:
     runs-on: ubuntu-slim
     steps:
+      # Its post step runs after Harden-Runner's and prints the job summary.
+      - uses: sailikhith-stepsecurity-experiments-2/repo-1/.github/actions/dump-summary@main
       - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
@@ -30,6 +33,8 @@ jobs:
     runs-on: ubuntu-latest
     container: node:22
     steps:
+      # Its post step runs after Harden-Runner's and prints the job summary.
+      - uses: sailikhith-stepsecurity-experiments-2/repo-1/.github/actions/dump-summary@main
       - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
@@ -41,6 +46,8 @@ jobs:
   macos-hr-key:
     runs-on: macos-latest
     steps:
+      # Its post step runs after Harden-Runner's and prints the job summary.
+      - uses: sailikhith-stepsecurity-experiments-2/repo-1/.github/actions/dump-summary@main
       - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
@@ -59,6 +66,8 @@ jobs:
       contents: read
       id-token: write
     steps:
+      # Its post step runs after Harden-Runner's and prints the job summary.
+      - uses: sailikhith-stepsecurity-experiments-2/repo-1/.github/actions/dump-summary@main
       - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
