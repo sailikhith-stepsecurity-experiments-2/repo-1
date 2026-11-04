@@ -1,6 +1,8 @@
 # `ecosystem-defaults` and `ecosystems` in the secure-registry input
 # (SR-CI-11.2, backend SR-CI-05.2). Each job's comment says what the
 # Harden-Runner pre step should log; check-npm.sh checks npm itself.
+# macOS: int Harden-Runner builds kill ubuntu-latest jobs at random steps
+# (run 41825609482, 2 attempts, logs lost).
 name: SR-CI-11.2 ecosystem-defaults / ecosystems
 
 on:
@@ -12,7 +14,7 @@ permissions:
 jobs:
   # Resolved npm config: mode audit, cooldown 3 days (from ecosystem-defaults).
   eco-defaults-audit:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
       - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
@@ -29,7 +31,7 @@ jobs:
 
   # The npm block overrides ecosystem-defaults: mode enforce.
   eco-defaults-npm-override:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
       - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
@@ -46,7 +48,7 @@ jobs:
 
   # npm listed: routed, with ecosystem-defaults applied (mode audit).
   ecosystems-npm:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
       - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
@@ -62,7 +64,7 @@ jobs:
 
   # Same as `true`: routed, enforce with a 2-day cooldown.
   ecosystems-all:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
       - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
@@ -77,7 +79,7 @@ jobs:
   # npm not listed: no session. Expect notices unsupported_ecosystem (pypi) and
   # ecosystem_not_covered (npm), then "npm is not listed in ecosystems".
   ecosystems-pypi:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
       - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
@@ -92,7 +94,7 @@ jobs:
 
   # npm covered but off: no session, "npm is off".
   npm-off:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
       - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
@@ -106,7 +108,7 @@ jobs:
 
   # The old key is unknown now: notice, ignored, so npm stays on enforce.
   old-defaults-key:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
       - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
@@ -121,7 +123,7 @@ jobs:
 
   # An empty list is invalid_value: key ignored, coverage stays all.
   ecosystems-empty:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
       - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
