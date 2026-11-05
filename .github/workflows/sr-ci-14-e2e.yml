@@ -1,0 +1,39 @@
+# SR-CI-14 e2e after SR-CI-21/22: one community job whose secure-registry
+# activity should show in the job summary (held/blocked) and in run
+# insights on int1 (secure_registry_audit_records).
+#   - id-token: write, so the session binds as oidc (shown in insights)
+#   - npm ci through the registry, then the typescript@next cooldown probe
+#     (2-day cooldown hides it in metadata and refuses the tarball)
+# The dump-summary post step prints the job summary in the log.
+name: SR-CI-14 e2e
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        type: string
+        default: macos-latest
+
+permissions:
+  contents: read
+
+jobs:
+  community-oidc:
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: sailikhith-stepsecurity-experiments-2/repo-1/.github/actions/dump-summary@main
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - name: npm ci through secure-registry
+        run: bash .github/scripts/check-npm.sh secure
+      - name: Cooldown probe (held and blocked)
+        run: bash .github/scripts/check-npm.sh cooldown blocked
