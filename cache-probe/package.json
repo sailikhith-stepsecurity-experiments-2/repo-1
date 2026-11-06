@@ -1,0 +1,9 @@
+{
+  "name": "cache-probe",
+  "private": true,
+  "description": "SR-CI-14: does a setup-node npm cache let npm ci skip secure-registry?",
+  "dependencies": {
+    "@harden-runner-canary/basic-npm-package": "1.5.0",
+    "ms": "2.1.3"
+  }
+}

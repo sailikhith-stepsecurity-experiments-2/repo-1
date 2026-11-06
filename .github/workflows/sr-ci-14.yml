@@ -1,6 +1,6 @@
 # SR-CI-14 end-to-end matrix for community secure-registry on int.
 # Uses the int build of the SR-CI-11 pre step + SR-CI-12 post step.
-# ubuntu-latest runs the full Harden-Runner agent, which int builds kill
+# ubuntu-latest runs the full Harden-Runner agent, which older int builds killed
 # (see control.yml), so only the rows that need it (docker build, egress
 # block) run there; treat a killed job as the known environment issue.
 name: SR-CI-14 e2e
@@ -40,7 +40,7 @@ jobs:
     env:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: true
@@ -92,7 +92,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: true
@@ -120,7 +120,7 @@ jobs:
     env:
       NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: true
@@ -135,7 +135,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: true
@@ -155,7 +155,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: true
@@ -179,7 +179,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: true
@@ -196,7 +196,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: block
           allowed-endpoints: >

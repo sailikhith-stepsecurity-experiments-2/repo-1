@@ -1,0 +1,91 @@
+# SR-CI-14: does a setup-node `cache: npm` let npm ci skip secure-registry?
+# cache-probe/ pins @harden-runner-canary/basic-npm-package@1.5.0, which
+# secure-registry refuses as compromised (no install scripts, safe to install).
+#   warm     no secure-registry: npm ci from npmjs, setup-node saves ~/.npm
+#   cached   secure-registry + the same cache: does npm ci still reach us?
+#   control  secure-registry, no cache: expect E403 on the canary
+name: SR-CI-14 npm cache bypass
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cache-probe
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: cache-probe/package-lock.json
+      - run: npm ci --no-audit --no-fund
+
+  cached:
+    needs: warm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: cache-probe
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: cache-probe/package-lock.json
+      - name: npm ci with the restored cache
+        run: |
+          npm config get registry
+          rc=0
+          npm ci --no-audit --no-fund --loglevel=http > "$RUNNER_TEMP/ci.log" 2>&1 || rc=$?
+          grep -E 'npm http|npm error' "$RUNNER_TEMP/ci.log" || true
+          fetches=$(grep -c 'npm http fetch' "$RUNNER_TEMP/ci.log" || true)
+          if [ "$rc" -eq 0 ]; then
+            echo "::warning title=cache bypass::npm ci installed the compromised canary from the setup-node cache ($fetches registry fetches)"
+          else
+            echo "::notice title=cache bypass::npm ci refused the canary even with the cache (exit $rc, $fetches fetches)"
+          fi
+
+  control:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: cache-probe
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: npm ci without a cache (expect E403)
+        run: |
+          rc=0
+          npm ci --no-audit --no-fund > "$RUNNER_TEMP/ci.log" 2>&1 || rc=$?
+          grep -E 'npm error (code|403)' "$RUNNER_TEMP/ci.log" | head -3 || true
+          [ "$rc" -ne 0 ] || { echo "::error::the canary installed without a cache"; exit 1; }

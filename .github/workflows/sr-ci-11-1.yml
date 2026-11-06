@@ -24,7 +24,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: true
@@ -39,7 +39,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: true
@@ -51,7 +51,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-slim
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: true
@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     container: node:22
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: true
@@ -76,7 +76,7 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
     runs-on: macos-latest
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12-secure-registry-post
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: true

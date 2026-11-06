@@ -17,7 +17,7 @@ jobs:
     runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: |
@@ -34,7 +34,7 @@ jobs:
     runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: |
@@ -51,7 +51,7 @@ jobs:
     runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: |
@@ -67,7 +67,7 @@ jobs:
     runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: |
@@ -82,7 +82,7 @@ jobs:
     runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: |
@@ -97,7 +97,7 @@ jobs:
     runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: |
@@ -111,7 +111,7 @@ jobs:
     runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: |
@@ -126,7 +126,7 @@ jobs:
     runs-on: macos-latest
     permissions: { contents: read, id-token: write }
     steps:
-      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-11.2-ecosystem-defaults
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
           secure-registry: |
