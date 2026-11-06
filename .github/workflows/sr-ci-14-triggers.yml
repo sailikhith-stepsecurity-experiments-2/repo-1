@@ -3,7 +3,7 @@
 # the PR head.
 #   same-repo / Dependabot pull_request   -> secure-registry
 #   pull_request_target (fork or not)     -> secure-registry
-#   fork pull_request                     -> no OIDC token, default registry + fork notice
+#   fork pull_request                     -> no OIDC token, hr_key session (SR-CI-11.1)
 name: SR-CI-14 triggers
 
 on:
@@ -33,6 +33,5 @@ jobs:
         run: |
           echo "event=$EVENT actor=$ACTOR head=$HEAD_REPO fork=$FORK"
           expect=secure
-          if [ "$EVENT" = pull_request ] && [ "$FORK" = true ]; then expect=default; fi
           echo "expect: $expect"
           bash .github/scripts/check-npm.sh "$expect"
