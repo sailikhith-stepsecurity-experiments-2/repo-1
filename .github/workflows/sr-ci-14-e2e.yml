@@ -1,22 +1,16 @@
-# SR-CI-14 e2e after SR-CI-21/22: one community job whose secure-registry
-# activity should show in the job summary (held/blocked) and in run
-# insights on int1 (secure_registry_audit_records).
-#   - id-token: write, so the session binds as oidc (shown in insights)
-#   - npm ci through the registry, then the typescript@next cooldown probe
-#     (2-day cooldown hides it in metadata and refuses the tarball)
-# The dump-summary post step prints the job summary in the log.
 name: SR-CI-14 e2e
-
 on:
   workflow_dispatch:
     inputs:
       runner:
         type: string
         default: macos-latest
-
+      settle_seconds:
+        description: Seconds to wait after the last registry request, so async audit rows land before the post-step summary and insights read them
+        type: string
+        default: '20'
 permissions:
   contents: read
-
 jobs:
   community-oidc:
     runs-on: ${{ inputs.runner }}
@@ -37,3 +31,6 @@ jobs:
         run: bash .github/scripts/check-npm.sh secure
       - name: Cooldown probe (held and blocked)
         run: bash .github/scripts/check-npm.sh cooldown blocked
+      - name: Wait for audit rows to land (test only)
+        if: ${{ inputs.settle_seconds != '0' }}
+        run: sleep "${{ inputs.settle_seconds }}"
