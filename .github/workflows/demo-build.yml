@@ -20,7 +20,11 @@ jobs:
         uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
-          secure-registry: true
+          secure-registry: |
+            npm:
+              cooldown:
+                exemptions:
+                  - "minimatch@11.0.5"
 
       - uses: actions/checkout@v4
         with:
