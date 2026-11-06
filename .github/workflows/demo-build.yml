@@ -9,6 +9,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # secure-registry exchanges the OIDC token for a run token
     defaults:
       run:
         working-directory: demo-app
@@ -17,6 +20,7 @@ jobs:
         uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
         with:
           egress-policy: audit
+          secure-registry: true
 
       - uses: actions/checkout@v4
         with:
