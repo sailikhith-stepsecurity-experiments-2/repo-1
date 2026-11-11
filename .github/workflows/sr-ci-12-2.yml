@@ -1,0 +1,89 @@
+# SR-CI-12.2 / 12.3 e2e: the job summary shows the cooldown window in the
+# Held intro, caps each table at five rows with a link to the run's
+# Packages tab, and lists audit-mode would-blocks. fresh-versions.sh requests
+# more than five fresh versions so the cap shows. ubuntu-latest without a
+# container is left out: int Harden-Runner builds kill those jobs.
+# The job summary is printed in the log by the dump-summary post step.
+name: SR-CI-12.2 cooldown window and row cap
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # binding oidc. Expect: Blocked first, "Showing 5 of N." with the run
+  # insights link; Held intro ends "The cooldown for this job is 2 days."
+  enforce-oidc:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity-experiments-2/repo-1/.github/actions/dump-summary@main
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/fresh-versions.sh
+      # Audit rows reach the summary store 11 to 23 s after the request.
+      - run: sleep 45
+
+  # binding hr_key (no id-token). Expect: the same, with the link.
+  enforce-hr-key:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: sailikhith-stepsecurity-experiments-2/repo-1/.github/actions/dump-summary@main
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
+        with:
+          egress-policy: audit
+          secure-registry: true
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/fresh-versions.sh
+      - run: sleep 45
+
+  # ubuntu-slim has no /monitor, so no correlation ID. Expect: "Showing 5
+  # of N." without a link; Held intro says 5 days.
+  enforce-slim-5-days:
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity-experiments-2/repo-1/.github/actions/dump-summary@main
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
+        with:
+          egress-policy: audit
+          secure-registry: |
+            npm:
+              cooldown:
+                days: 5
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/fresh-versions.sh
+        env:
+          MAX_AGE_HOURS: "120"
+      - run: sleep 45
+
+  # mode audit. Expect: a "Would be blocked" table (capped, with the link),
+  # no exemption snippet for those rows.
+  audit:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: sailikhith-stepsecurity-experiments-2/repo-1/.github/actions/dump-summary@main
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.1-binding-summary
+        with:
+          egress-policy: audit
+          secure-registry: |
+            npm:
+              mode: audit
+      - uses: actions/checkout@v4
+      - run: bash .github/scripts/fresh-versions.sh
+      - run: sleep 45
