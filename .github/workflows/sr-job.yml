@@ -1,0 +1,64 @@
+# Reusable job: Harden-Runner (fork, int build) routes npm through
+# secure-registry, then installs the lockfile and probes cooldown.
+# Policy lookup uses the CALLER's workflow file (workflow_ref), so ci.yml and
+# release.yml can get different policies.
+name: sr-job
+
+on:
+  workflow_call:
+    inputs:
+      config:
+        description: "secure-registry input passed to Harden-Runner"
+        type: string
+        default: "true"
+      runner:
+        type: string
+        default: ubuntu-latest
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  install:
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: sailikhith-stepsecurity/harden-runner@int/sr-ci-12.4-server-summary
+        with:
+          egress-policy: audit
+          secure-registry: ${{ inputs.config }}
+
+      - uses: actions/checkout@v4
+
+      - name: Show npm registry
+        shell: bash
+        run: |
+          echo "NPM_CONFIG_USERCONFIG=${NPM_CONFIG_USERCONFIG:-<unset>}"
+          echo "registry: $(npm config get registry)"
+
+      - name: npm ci
+        shell: bash
+        run: npm ci --no-audit --no-fund
+
+      - name: Compromised probe (left-pad@1.3.0 is flagged on int)
+        shell: bash
+        run: |
+          if out=$(npm pack left-pad@1.3.0 --dry-run 2>&1); then
+            echo "PROBE: SERVED left-pad@1.3.0"
+          else
+            echo "PROBE: BLOCKED left-pad@1.3.0"
+            echo "$out" | grep -m1 "403" || true
+          fi
+
+      - name: Cooldown probe (newest typescript release)
+        shell: bash
+        run: |
+          read -r v published < <(npm view typescript time --json --registry=https://registry.npmjs.org \
+            | jq -r 'to_entries | map(select(.key != "created" and .key != "modified")) | max_by(.value) | "\(.key) \(.value)"')
+          echo "newest typescript on npmjs: $v published $published"
+          if out=$(npm view "typescript@$v" version 2>&1); then
+            echo "PROBE: SERVED typescript@$v ($out)"
+          else
+            echo "PROBE: HELD typescript@$v"
+            echo "$out" | tail -3
+          fi
